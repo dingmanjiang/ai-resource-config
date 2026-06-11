@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Resource Config — 可视化面板</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--bg4:#30363d;
+  --fg:#e6edf3;--fg2:#8b949e;--fg3:#6e7681;
+  --accent:#58a6ff;--green:#3fb950;--yellow:#d29922;--red:#f85149;--purple:#bc8cff;--orange:#f0883e;--cyan:#39d2c0;
+  --border:#30363d;--radius:8px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --mono:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;
+}
+html{font-size:14px;background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.5}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg3);padding:1px 5px;border-radius:3px}
+
+/* Layout */
+#app{max-width:1400px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+header h1{font-size:1.4rem;font-weight:600;display:flex;align-items:center;gap:8px}
+header .meta{font-size:.85rem;color:var(--fg2)}
+.loading{text-align:center;padding:60px 20px;color:var(--fg2);font-size:1.1rem}
+.error{background:var(--bg3);border:1px solid var(--red);border-radius:var(--radius);padding:20px;color:var(--red)}
+
+/* Tabs */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto}
+.tab{padding:8px 16px;cursor:pointer;color:var(--fg2);border-bottom:2px solid transparent;white-space:nowrap;font-size:.95rem;transition:color .15s,border-color .15s}
+.tab:hover{color:var(--fg)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.view{display:none}
+.view.active{display:block}
+
+/* Shared table styles */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius)}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{padding:8px 12px;text-align:left;white-space:nowrap}
+th{background:var(--bg3);color:var(--fg2);font-weight:600;position:sticky;top:0;cursor:pointer;user-select:none}
+th:hover{color:var(--fg)}
+th .sort-arrow{margin-left:4px;font-size:.7rem}
+td{border-top:1px solid var(--border)}
+tr:hover td{background:var(--bg2)}
+tr.highlighted td{background:rgba(88,166,255,.12)}
+
+/* Badges */
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.8rem;font-weight:600}
+.badge-t1{background:rgba(248,81,73,.15);color:var(--red)}
+.badge-t2{background:rgba(210,153,34,.15);color:var(--yellow)}
+.badge-t3{background:rgba(63,185,80,.15);color:var(--green)}
+.badge-confidence-high{background:rgba(63,185,80,.15);color:var(--green)}
+.badge-confidence-medium{background:rgba(210,153,34,.15);color:var(--yellow)}
+.badge-confidence-low{background:rgba(248,81,73,.15);color:var(--red)}
+.badge-role{background:rgba(88,166,255,.12);color:var(--accent)}
+.badge-redline{background:rgba(248,81,73,.2);color:var(--red);border:1px solid var(--red)}
+.badge-reasoning{background:rgba(188,140,255,.12);color:var(--purple)}
+
+/* Filters */
+.filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.filters input,.filters select{background:var(--bg3);border:1px solid var(--border);color:var(--fg);padding:6px 10px;border-radius:6px;font-size:.85rem;font-family:var(--font)}
+.filters input{min-width:200px}
+.filters select{min-width:120px}
+.filters .count{color:var(--fg3);font-size:.85rem;margin-left:4px}
+
+/* Cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.card h3{font-size:1.05rem;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.card .sub{color:var(--fg2);font-size:.85rem;margin-bottom:10px}
+.card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.9rem}
+.card dt{color:var(--fg2);font-weight:500}
+.card dd{color:var(--fg)}
+.card ul{padding-left:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.card ul li{background:var(--bg3);padding:2px 8px;border-radius:4px;font-size:.85rem}
+.card .free-tag{background:rgba(63,185,80,.15);color:var(--green)}
+
+/* Heatmap */
+.heatmap-legend{display:flex;align-items:center;gap:12px;margin-bottom:12px;font-size:.85rem;color:var(--fg2);flex-wrap:wrap}
+.heatmap-legend .swatch{width:16px;height:16px;border-radius:3px;display:inline-block;vertical-align:middle}
+.heatmap-wrap{overflow:auto;border:1px solid var(--border);border-radius:var(--radius);max-height:70vh}
+.heatmap-wrap table{font-size:.82rem}
+.heatmap-wrap th,.heatmap-wrap td{padding:5px 8px}
+.heatmap-cell{text-align:right;font-family:var(--mono);font-weight:500;border-radius:2px}
+.heatmap-cell.cheapest{outline:2px solid var(--accent);outline-offset:-2px}
+.heatmap-cell.empty{color:var(--fg3)}
+
+/* Model ref link */
+.model-link{cursor:pointer;color:var(--accent);border:none;background:none;font:inherit;padding:0}
+.model-link:hover{text-decoration:underline}
+
+/* Detail row */
+.detail-row td{padding:0;background:var(--bg2)}
+.detail-content{padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.offering-card{background:var(--bg3);border-radius:6px;padding:10px 12px}
+.offering-card h4{font-size:.9rem;margin-bottom:6px;color:var(--fg)}
+.offering-card .prices{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:.85rem}
+.offering-card .prices span{color:var(--fg2)}
+.offering-card .prices strong{color:var(--fg);font-weight:500}
+
+/* Section title */
+.section-title{font-size:1.1rem;font-weight:600;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+
+/* Expand icon */
+.expand-icon{display:inline-block;width:16px;text-align:center;color:var(--fg3);transition:transform .15s}
+.expanded .expand-icon{transform:rotate(90deg)}
+
+/* Footer */
+footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--border);font-size:.8rem;color:var(--fg3);text-align:center}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;max-width:700px;width:90%;max-height:80vh;overflow:auto}
+.modal h3{margin-bottom:12px}
+.modal-close{float:right;cursor:pointer;color:var(--fg2);font-size:1.2rem;background:none;border:none}
+.modal-close:hover{color:var(--fg)}
+.modal table{font-size:.85rem}
+.modal th{background:var(--bg4)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="loading">正在加载 model-map.json …</div>
+</div>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const app = $('#app');
+
+let DATA = null;
+let currentView = 'routing';
+let modelTableState = {sortKey:'name',sortDir:1,search:'',provider:'',family:'',reasoning:''};
+let heatmapState = {filter:'all'};
+
+const TIER_ORDER = {T1:0,T2:1,T3:2};
+const REASONING_MAP = {heavy:'重度',medium:'中度',light:'轻度'};
+const ROLE_MAP = {'vendor-oauth-direct':'厂商 OAuth 直连','vendor-coding-plan':'厂商编码计划','aggregator-payg':'聚合按量计费'};
+const ROLE_SHORT = {'vendor-oauth-direct':'OAuth','vendor-coding-plan':'编码计划','aggregator-payg':'PAYG 聚合'};
+
+function fmt(n){return n==null?'—':('$'+n.toFixed(2))}
+function fmtCtx(n){if(n>=1e6)return(n/1e6)+'M';if(n>=1e3)return(n/1e3)+'K';return n}
+function fmtDate(d){return d||'—'}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+function confidenceClass(c){return c?'badge-confidence-'+c:''}
+
+function priceColor(val,min,max){
+  if(val==null)return'var(--bg3)';
+  const t=max>min?(val-min)/(max-min):0;
+  const r=Math.round(248*t+33*(1-t));
+  const g=Math.round(81*t+185*(1-t));
+  const b=Math.round(73*t+80*(1-t));
+  return`rgba(${r},${g},${b},0.18)`;
+}
+
+function renderApp(){
+  app.innerHTML = `
+  <header>
+    <h1>AI Resource Config <span style="font-size:.7em;color:var(--fg3)">v${esc(DATA.version||'')}</span></h1>
+    <div class="meta">
+      数据更新: ${esc(DATA.updated||'')} · 下次 review: ${esc(DATA.review_due||'')} · 模型数: ${DATA.objective.model_count}
+    </div>
+  </header>
+  <nav class="tabs" id="tabs">
+    <div class="tab active" data-view="routing">路由表</div>
+    <div class="tab" data-view="models">模型比较</div>
+    <div class="tab" data-view="providers">Provider 概览</div>
+    <div class="tab" data-view="heatmap">价格热力图</div>
+  </nav>
+  <div id="view-routing" class="view active"></div>
+  <div id="view-models" class="view"></div>
+  <div id="view-providers" class="view"></div>
+  <div id="view-heatmap" class="view"></div>
+  <footer>ai-resource-config · <a href="https://github.com/dingmanjiang/ai-resource-config">GitHub</a> · 数据来源: <a href="https://models.dev">models.dev</a> (MIT)</footer>
+  `;
+  renderRouting();
+  renderModels();
+  renderProviders();
+  renderHeatmap();
+  bindTabs();
+}
+
+function bindTabs(){
+  $$('.tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      $$('.tab').forEach(t=>t.classList.remove('active'));
+      $$('.view').forEach(v=>v.classList.remove('active'));
+      tab.classList.add('active');
+      const view = tab.dataset.view;
+      $(`#view-${view}`).classList.add('active');
+      currentView = view;
+    });
+  });
+}
+
+function switchToModels(modelKey){
+  $$('.tab').forEach(t=>t.classList.remove('active'));
+  $$('.view').forEach(v=>v.classList.remove('active'));
+  $$('.tab')[1].classList.add('active');
+  $('#view-models').classList.add('active');
+  currentView = 'models';
+  modelTableState.search = DATA.objective.models[modelKey]?.name||'';
+  renderModels();
+  setTimeout(()=>{
+    const row = document.querySelector(`tr[data-model-key="${CSS.escape(modelKey)}"]`);
+    if(row){row.scrollIntoView({behavior:'smooth',block:'center'});row.classList.add('highlighted');setTimeout(()=>row.classList.remove('highlighted'),2000)}
+  },100);
+}
+
+function modelLink(modelRef){
+  if(!modelRef)return'—';
+  const m=DATA.objective.models[modelRef];
+  return m?`<button class="model-link" onclick="window.__switchToModels('${esc(modelRef)}')">${esc(m.name)}</button>`:esc(modelRef);
+}
+window.__switchToModels = switchToModels;
+
+// ==================== V1: Routing ====================
+function renderRouting(){
+  const tt = DATA.subjective.task_types;
+  const container = $('#view-routing');
+  let html = `<div class="table-wrap"><table id="routing-table">
+    <thead><tr>
+      <th>Task Type</th><th>Tier</th><th>Reasoning</th>
+      <th>Primary</th><th>Fallback</th><th>Downgrade</th>
+      <th>Confidence</th><th>Note</th>
+    </tr></thead><tbody>`;
+
+  const keys = Object.keys(tt).sort((a,b)=>(TIER_ORDER[tt[a].tier]||9)-(TIER_ORDER[tt[b].tier]||9)||a.localeCompare(b));
+
+  for(const k of keys){
+    const t=tt[k];
+    const ev=t.evidence||{};
+    const isRedline=t.redline;
+    html+=`<tr>
+      <td><code>${esc(k)}</code>${isRedline?' <span class="badge badge-redline">REDLINE</span>':''}</td>
+      <td><span class="badge badge-t${t.tier?.[1]||''}">${esc(t.tier||'')}</span></td>
+      <td><span class="badge badge-reasoning">${esc(REASONING_MAP[t.reasoning_need]||t.reasoning_need||'')}</span></td>
+      <td>${slotCell(t.primary)}</td>
+      <td>${slotCell(t.fallback)}</td>
+      <td>${slotCell(t.downgrade)}</td>
+      <td>${ev.confidence?`<span class="badge ${confidenceClass(ev.confidence)}">${esc(ev.confidence)}</span>`:''}</td>
+      <td style="white-space:normal;max-width:250px;font-size:.85rem;color:var(--fg2)">${esc(t.note||ev.source||'')}</td>
+    </tr>`;
+  }
+  html+=`</tbody></table></div>`;
+
+  const rl=DATA.subjective.redline_models||[];
+  if(rl.length){
+    html+=`<div class="section-title">Redline 模型</div><p style="color:var(--fg2);font-size:.9rem">强制不分流: ${rl.map(r=>{const m=DATA.objective.models[r];return m?`<strong>${esc(m.name)}</strong>`:esc(r)}).join(', ')}</p>`;
+  }
+
+  const mcp=DATA.subjective.mcp||{};
+  if(Object.keys(mcp).length){
+    html+=`<div class="section-title">MCP 资源</div><div class="table-wrap"><table><thead><tr><th>Provider</th><th>Name</th><th>Capabilities</th><th>Type</th><th>Note</th></tr></thead><tbody>`;
+    for(const[prov,tools] of Object.entries(mcp)){
+      for(const tool of tools){
+        html+=`<tr><td>${esc(prov)}</td><td><code>${esc(tool.name)}</code></td><td>${(tool.capabilities||[]).map(c=>`<span class="badge badge-role">${esc(c)}</span>`).join(' ')}</td><td>${esc(tool.type)}</td><td style="color:var(--fg2)">${esc(tool.note||'')}</td></tr>`;
+      }
+    }
+    html+=`</tbody></table></div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function slotCell(slot){
+  if(!slot)return'<span style="color:var(--fg3)">—</span>';
+  const ref=slot.model_ref;
+  const m=DATA.objective.models[ref];
+  const parts=[modelLink(ref)];
+  if(m){
+    const cheapest=m.cheapest;
+    parts.push(`<span style="color:var(--fg3);font-size:.8rem">${esc(slot.provider)}${slot.effort?' / effort='+esc(slot.effort):''}</span>`);
+  }else{
+    parts.push(`<span style="color:var(--fg3);font-size:.8rem">${esc(slot.provider)}</span>`);
+  }
+  return parts.join('<br>');
+}
+
+// ==================== V2: Model Comparison ====================
+function renderModels(){
+  const models = DATA.objective.models;
+  const container = $('#view-models');
+
+  const families = [...new Set(Object.values(models).map(m=>m.family).filter(Boolean))].sort();
+  const providers = DATA.objective.providers_of_interest.filter(p=>p!=='openrouter');
+
+  let html = `<div class="filters">
+    <input type="text" id="model-search" placeholder="搜索模型名 / family …" value="${esc(modelTableState.search)}">
+    <select id="filter-provider"><option value="">全部 Provider</option>${providers.map(p=>`<option value="${esc(p)}" ${modelTableState.provider===p?'selected':''}>${esc(p)}</option>`).join('')}</select>
+    <select id="filter-family"><option value="">全部 Family</option>${families.map(f=>`<option value="${esc(f)}" ${modelTableState.family===f?'selected':''}>${esc(f)}</option>`).join('')}</select>
+    <select id="filter-reasoning"><option value="">Reasoning</option><option value="yes" ${modelTableState.reasoning==='yes'?'selected':''}>Yes</option><option value="no" ${modelTableState.reasoning==='no'?'selected':''}>No</option></select>
+    <span class="count" id="model-count"></span>
+  </div>`;
+
+  html += `<div class="table-wrap" style="max-height:70vh;overflow:auto"><table id="model-table">
+    <thead><tr>
+      <th data-key="name">模型名 <span class="sort-arrow">↕</span></th>
+      <th data-key="family">Family <span class="sort-arrow">↕</span></th>
+      <th data-key="context">Context <span class="sort-arrow">↕</span></th>
+      <th data-key="output_limit">Output <span class="sort-arrow">↕</span></th>
+      <th data-key="reasoning">Reasoning <span class="sort-arrow">↕</span></th>
+      <th data-key="offerings_count">Providers <span class="sort-arrow">↕</span></th>
+      <th data-key="cheapest_provider">最便宜 <span class="sort-arrow">↕</span></th>
+      <th data-key="cheapest_price">$/MTok <span class="sort-arrow">↕</span></th>
+    </tr></thead><tbody id="model-tbody"></tbody></table></div>`;
+
+  container.innerHTML = html;
+  renderModelRows();
+  bindModelFilters();
+}
+
+function renderModelRows(){
+  const models = DATA.objective.models;
+  const s = modelTableState;
+  const searchLower = s.search.toLowerCase();
+
+  let entries = Object.entries(models).filter(([k,m])=>{
+    if(searchLower && !m.name.toLowerCase().includes(searchLower) && !(m.family||'').toLowerCase().includes(searchLower))return false;
+    if(s.provider && !m.offerings.some(o=>o.provider===s.provider))return false;
+    if(s.family && m.family!==s.family)return false;
+    if(s.reasoning==='yes' && !m.reasoning)return false;
+    if(s.reasoning==='no' && m.reasoning)return false;
+    return true;
+  });
+
+  const sortKey = s.sortKey;
+  entries.sort(([ka,a],[kb,b])=>{
+    let va,vb;
+    switch(sortKey){
+      case'name':va=a.name.toLowerCase();vb=b.name.toLowerCase();break;
+      case'family':va=a.family||'';vb=b.family||'';break;
+      case'context':va=a.context||0;vb=b.context||0;break;
+      case'output_limit':va=a.output_limit||0;vb=b.output_limit||0;break;
+      case'reasoning':va=a.reasoning?1:0;vb=b.reasoning?1:0;break;
+      case'offerings_count':va=a.offerings.length;vb=b.offerings.length;break;
+      case'cheapest_provider':va=a.cheapest?.provider||'';vb=b.cheapest?.provider||'';break;
+      case'cheapest_price':va=a.cheapest?.total_per_mtok||Infinity;vb=b.cheapest?.total_per_mtok||Infinity;break;
+      default:va=a.name;vb=b.name;
+    }
+    if(typeof va==='string')return va.localeCompare(vb)*s.sortDir;
+    return(va-vb)*s.sortDir;
+  });
+
+  const countEl=$('#model-count');
+  if(countEl)countEl.textContent=`${entries.length} / ${Object.keys(models).length} 模型`;
+
+  const tbody=$('#model-tbody');
+  if(!tbody)return;
+  tbody.innerHTML = entries.map(([key,m])=>{
+    const offerings=m.offerings||[];
+    const cheapest=m.cheapest||{};
+    return `<tr data-model-key="${esc(key)}" class="model-row" data-key="${esc(key)}">
+      <td><span class="expand-icon">▸</span> ${esc(m.name)}</td>
+      <td style="color:var(--fg2)">${esc(m.family||'—')}</td>
+      <td>${fmtCtx(m.context)}</td>
+      <td>${fmtCtx(m.output_limit)}</td>
+      <td>${m.reasoning?'<span class="badge badge-reasoning">Yes</span>':'—'}</td>
+      <td>${offerings.length}</td>
+      <td>${esc(cheapest.provider||'—')}</td>
+      <td style="font-family:var(--mono)">${cheapest.total_per_mtok!=null?'$'+cheapest.total_per_mtok.toFixed(2):'—'}</td>
+    </tr>
+    <tr class="detail-row" data-detail="${esc(key)}" style="display:none"><td colspan="8">
+      <div class="detail-content">${offerings.map(o=>`<div class="offering-card">
+        <h4>${esc(o.provider)}</h4>
+        <div style="font-size:.8rem;color:var(--fg3);margin-bottom:4px">${esc(o.model_id)}</div>
+        <div class="prices">
+          <span>Input:</span><strong>${fmt(o.input)}</strong>
+          <span>Output:</span><strong>${fmt(o.output)}</strong>
+          ${o.cache_read!=null?`<span>Cache Read:</span><strong>${fmt(o.cache_read)}</strong>`:''}
+          ${o.cache_write!=null?`<span>Cache Write:</span><strong>${fmt(o.cache_write)}</strong>`:''}
+        </div>
+      </div>`).join('')}</div>
+    </td></tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.model-row').forEach(row=>{
+    row.addEventListener('click',()=>{
+      const key=row.dataset.key;
+      const detail=tbody.querySelector(`[data-detail="${CSS.escape(key)}"]`);
+      const isExpanded=detail.style.display!=='none';
+      detail.style.display=isExpanded?'none':'table-row';
+      row.classList.toggle('expanded',!isExpanded);
+    });
+  });
+}
+
+function bindModelFilters(){
+  const debounced=debounce(()=>renderModelRows(),200);
+  const searchEl=$('#model-search');
+  if(searchEl)searchEl.addEventListener('input',e=>{modelTableState.search=e.target.value;debounced()});
+  const provEl=$('#filter-provider');
+  if(provEl)provEl.addEventListener('change',e=>{modelTableState.provider=e.target.value;renderModelRows()});
+  const famEl=$('#filter-family');
+  if(famEl)famEl.addEventListener('change',e=>{modelTableState.family=e.target.value;renderModelRows()});
+  const reasEl=$('#filter-reasoning');
+  if(reasEl)reasEl.addEventListener('change',e=>{modelTableState.reasoning=e.target.value;renderModelRows()});
+
+  document.querySelectorAll('#model-table th[data-key]').forEach(th=>{
+    th.addEventListener('click',()=>{
+      const key=th.dataset.key;
+      if(modelTableState.sortKey===key)modelTableState.sortDir*=-1;
+      else{modelTableState.sortKey=key;modelTableState.sortDir=1}
+      renderModelRows();
+      updateSortArrows(th.closest('table'),key,modelTableState.sortDir);
+    });
+  });
+}
+
+function updateSortArrows(table,key,dir){
+  table.querySelectorAll('th').forEach(th=>{
+    const arrow=th.querySelector('.sort-arrow');
+    if(!arrow)return;
+    if(th.dataset.key===key)arrow.textContent=dir>0?'↑':'↓';
+    else arrow.textContent='↕';
+  });
+}
+
+// ==================== V3: Provider Overview ====================
+function renderProviders(){
+  const pp=DATA.subjective.provider_picks;
+  const models=DATA.objective.models;
+  const container=$('#view-providers');
+  let html='<div class="cards">';
+
+  for(const[name,p] of Object.entries(pp)){
+    const provModels=Object.entries(models).filter(([k,m])=>m.offerings.some(o=>o.provider===p.models_dev_id||o.provider===name));
+    const modelCount=provModels.length;
+
+    html+=`<div class="card">
+      <h3>${esc(name)} <span class="badge badge-role">${esc(ROLE_SHORT[p.role]||p.role)}</span></h3>
+      <div class="sub">${esc(ROLE_MAP[p.role]||p.role)} · ${modelCount} 模型${p.effort_knob===true?' · 支持 Effort 旋钮':p.effort_knob==='varies'?' · Effort 因模型而异':''}</div>
+      <dl>
+        <dt>Flagship</dt><dd>${modelLink(findModelRef(p.flagship,models))}</dd>
+        <dt>Economy</dt><dd>${modelLink(findModelRef(p.economy_downgrade,models))}</dd>
+      </dl>
+      ${p.recommended?.length?`<div style="margin-top:8px"><dt style="margin-bottom:4px">Recommended</dt><ul>${p.recommended.map(r=>`<li>${modelLink(findModelRef(r,models))}</li>`).join('')}</ul></div>`:''}
+      ${p.free?.length?`<div style="margin-top:8px"><dt style="margin-bottom:4px">Free</dt><ul>${p.free.map(r=>`<li class="free-tag">${esc(r)}</li>`).join('')}</ul></div>`:''}
+      ${p.note?`<div style="margin-top:8px;font-size:.85rem;color:var(--fg2)">${esc(p.note)}</div>`:''}
+    </div>`;
+  }
+
+  html+='</div>';
+  container.innerHTML=html;
+}
+
+function findModelRef(displayName,models){
+  if(!displayName)return null;
+  const lower=displayName.toLowerCase();
+  for(const[k,m] of Object.entries(models)){
+    if(m.name.toLowerCase()===lower||k===lower)return k;
+  }
+  return null;
+}
+
+// ==================== V4: Price Heatmap ====================
+function renderHeatmap(){
+  const models=DATA.objective.models;
+  const container=$('#view-heatmap');
+
+  const routingModels=new Set();
+  const tt=DATA.subjective.task_types;
+  for(const t of Object.values(tt)){
+    for(const slot of[t.primary,t.fallback,t.downgrade]){
+      if(slot?.model_ref)routingModels.add(slot.model_ref);
+    }
+  }
+  const pp=DATA.subjective.provider_picks;
+  const providers=[...new Set([...DATA.objective.providers_of_interest.filter(p=>p!=='openrouter'),...Object.keys(pp)])];
+  const provKeyMap={};
+  for(const[pk,pv] of Object.entries(pp)){provKeyMap[pk]=pv.models_dev_id}
+
+  let html=`<div class="filters">
+    <select id="heatmap-filter">
+      <option value="all">全部模型 (${Object.keys(models).length})</option>
+      <option value="routing" ${heatmapState.filter==='routing'?'selected':''}>路由相关 (${routingModels.size})</option>
+    </select>
+  </div>`;
+
+  let modelKeys=Object.keys(models);
+  if(heatmapState.filter==='routing')modelKeys=modelKeys.filter(k=>routingModels.has(k));
+
+  const colProviders=providers.filter(p=>modelKeys.some(k=>models[k].offerings.some(o=>o.provider===p)));
+
+  const priceData={};
+  let allPrices=[];
+  for(const k of modelKeys){
+    priceData[k]={};
+    for(const prov of colProviders){
+      const off=models[k].offerings.find(o=>o.provider===prov);
+      if(off){const total=(off.input||0)+(off.output||0);priceData[k][prov]=total;allPrices.push(total)}
+    }
+  }
+  const minP=allPrices.length?Math.min(...allPrices):0;
+  const maxP=allPrices.length?Math.max(...allPrices):1;
+
+  html+=`<div class="heatmap-legend">
+    <span>价格 ($/MTok, input+output):</span>
+    <span><span class="swatch" style="background:rgba(33,185,80,.3)"></span> 便宜</span>
+    <span><span class="swatch" style="background:rgba(248,81,73,.3)"></span> 昂贵</span>
+    <span style="margin-left:8px"><span class="swatch" style="outline:2px solid var(--accent);outline-offset:-2px"></span> = 同模型最便宜</span>
+    <span style="margin-left:auto;color:var(--fg3)">共 ${modelKeys.length} 模型 × ${colProviders.length} providers</span>
+  </div>`;
+
+  html+=`<div class="heatmap-wrap"><table><thead><tr><th>模型</th>`;
+  for(const p of colProviders)html+=`<th>${esc(p)}</th>`;
+  html+=`</tr></thead><tbody>`;
+
+  modelKeys.sort((a,b)=>(priceData[a]?.[colProviders[0]]||Infinity)-(priceData[b]?.[colProviders[0]]||Infinity));
+
+  for(const k of modelKeys){
+    const m=models[k];
+    const cheapestProv=m.cheapest?.provider;
+    html+=`<tr><td style="font-weight:500;position:sticky;left:0;background:var(--bg);z-index:1">${esc(m.name)}</td>`;
+    for(const p of colProviders){
+      const val=priceData[k]?.[p];
+      if(val!=null){
+        const isCheapest=p===cheapestProv;
+        html+=`<td class="heatmap-cell${isCheapest?' cheapest':''}" style="background:${priceColor(val,minP,maxP)}">$${val.toFixed(2)}</td>`;
+      }else{
+        html+=`<td class="heatmap-cell empty">—</td>`;
+      }
+    }
+    html+=`</tr>`;
+  }
+  html+=`</tbody></table></div>`;
+  container.innerHTML=html;
+
+  const filterEl=$('#heatmap-filter');
+  if(filterEl)filterEl.addEventListener('change',e=>{heatmapState.filter=e.target.value;renderHeatmap()});
+}
+
+function debounce(fn,ms){let t;return function(...a){clearTimeout(t);t=setTimeout(()=>fn.apply(this,a),ms)}}
+
+// ==================== Init ====================
+async function init(){
+  try{
+    const resp=await fetch('./model-map.json');
+    if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
+    DATA=await resp.json();
+    renderApp();
+  }catch(e){
+    app.innerHTML=`<div class="error">
+      <h3>加载失败</h3>
+      <p>无法加载 model-map.json: ${esc(e.message)}</p>
+      <p>如果你在本地打开此文件，请通过 HTTP 服务器访问（如 <code>npx serve .</code> 或 <code>python3 -m http.server</code>）。</p>
+      <p style="margin-top:12px">也可以直接查看 JSON 文件:
+        <a href="./model-map.json">model-map.json</a> ·
+        <a href="./models.json">models.json</a> ·
+        <a href="./routing.json">routing.json</a>
+      </p>
+    </div>`;
+  }
+}
+
+init();
+})();
+</script>
+</body>
+</html>
