@@ -1,0 +1,223 @@
+{
+  "$note": "Subjective layer. Hand-maintained. Task->model routing, curated picks, redline policy, MCP, consumption contract. Objective model data (price/context/capability) lives in models.json (auto-synced from models.dev). Each model reference carries: provider (who to call) + model_id (their id) + model_ref (key into models.json for capability/price join).",
+  "version": "v3.0 / model-tiers v0.7 / task-types v1.1",
+  "updated": "2026-06-11",
+  "review_due": "2026-07-11",
+  "input_sources": [
+    "CC docs/evidence/model-evaluations (sqlite-verified, 最高优先级)",
+    "005-llm-benchmark-map benchmark-status-table (外部信号, 经人 review)",
+    "02_Knowledge/外部Benchmark到任务类型的映射方法",
+    "models.json (objective layer, synced from models.dev)",
+    "provider 官方 MCP 目录（手动录入）"
+  ],
+  "redline_models": ["claude fable 5", "claude opus 4.8"],
+  "cross_provider_review": true,
+
+  "provider_picks": {
+    "openai-plus": {
+      "models_dev_id": "openai",
+      "role": "vendor-oauth-direct",
+      "recommended": ["gpt-5.5", "gpt-5.4", "gpt-5.4 mini", "gpt-5.4 nano"],
+      "flagship": "gpt-5.5",
+      "economy_downgrade": "gpt-5.4",
+      "effort_knob": true,
+      "free": [],
+      "note": "Plus 订阅内按 token 不另计费，价格以 models.json 的 openai 公价为参考"
+    },
+    "zai": {
+      "models_dev_id": "zai",
+      "role": "vendor-coding-plan",
+      "recommended": ["glm-5.1", "glm-5-turbo", "glm-4.7", "glm-4.5-air"],
+      "flagship": "glm-5.1",
+      "economy_downgrade": "glm-5-turbo",
+      "effort_knob": false,
+      "free": ["glm-4.7-flash"],
+      "note": "工具调用不扣 token；GLM 无 effort 旋钮"
+    },
+    "zenmux": {
+      "models_dev_id": "zenmux",
+      "role": "aggregator-payg",
+      "recommended": [
+        "claude fable 5",
+        "claude opus 4.8",
+        "gpt-5.5",
+        "deepseek v4 flash",
+        "gemini 2.5 flash"
+      ],
+      "flagship": "claude fable 5",
+      "economy_downgrade": "deepseek v4 flash",
+      "effort_knob": "varies",
+      "free": [
+        "step 3.7 flash",
+        "glm 4.7 flash (free)",
+        "glm 4.6v flash (free)"
+      ],
+      "note": "聚合平台；价格以 models.json 的 zenmux offerings 为准，账户结算优先"
+    }
+  },
+
+  "task_types": {
+    "spec-architecture": {
+      "tier": "T1", "reasoning_need": "heavy",
+      "primary": {"provider": "zenmux", "model_id": "anthropic/claude-opus-4.8", "model_ref": "claude opus 4.8", "effort": "high"},
+      "fallback": {"provider": "openai-plus", "model_id": "gpt-5.5", "model_ref": "gpt-5.5", "effort": "xhigh"},
+      "downgrade": null,
+      "evidence": {"confidence": "high", "source": "内部 spec session 回归", "metric": null, "url": null}
+    },
+    "redline-judgment": {
+      "tier": "T1", "reasoning_need": "heavy", "redline": true,
+      "primary": {"provider": "zenmux", "model_id": "anthropic/claude-opus-4.8", "model_ref": "claude opus 4.8", "effort": "high"},
+      "fallback": null,
+      "downgrade": null,
+      "note": "强制不分流给非-Opus；前3次版本迁移留档",
+      "evidence": {"confidence": "high", "source": "policy (redline)", "metric": null, "url": null}
+    },
+    "long-agentic-debug-code": {
+      "tier": "T1", "reasoning_need": "heavy",
+      "primary": {"provider": "zenmux", "model_id": "anthropic/claude-opus-4.8", "model_ref": "claude opus 4.8", "effort": "high"},
+      "fallback": {"provider": "openai-plus", "model_id": "gpt-5.5", "model_ref": "gpt-5.5", "effort": "xhigh"},
+      "downgrade": null,
+      "evidence": {"confidence": "medium", "source": "内部长链 debug 观察", "metric": null, "url": null}
+    },
+    "long-agentic-debug-terminal": {
+      "tier": "T1", "reasoning_need": "medium",
+      "primary": {"provider": "openai-plus", "model_id": "gpt-5.5", "model_ref": "gpt-5.5", "effort": "xhigh"},
+      "fallback": {"provider": "zenmux", "model_id": "anthropic/claude-opus-4.8", "model_ref": "claude opus 4.8", "effort": "high"},
+      "downgrade": null,
+      "note": "Terminal-Bench GPT-5.5 领先",
+      "evidence": {"confidence": "medium", "source": "Terminal-Bench (外部)", "metric": "GPT-5.5 leads", "url": null}
+    },
+    "multi-source-research": {
+      "tier": "T1", "reasoning_need": "heavy",
+      "primary": {"provider": "zenmux", "model_id": "anthropic/claude-opus-4.8", "model_ref": "claude opus 4.8", "effort": "high"},
+      "fallback": {"provider": "openai-plus", "model_id": "gpt-5.5", "model_ref": "gpt-5.5", "effort": "xhigh"},
+      "downgrade": null,
+      "note": "需 1M ctx",
+      "evidence": {"confidence": "medium", "source": "内部多源研究 session", "metric": null, "url": null}
+    },
+    "structural-review": {
+      "tier": "T2", "reasoning_need": "medium",
+      "primary": {"provider": "zai", "model_id": "glm-4.7", "model_ref": "glm-4.7"},
+      "fallback": {"provider": "openai-plus", "model_id": "gpt-5.5", "model_ref": "gpt-5.5", "effort": "high"},
+      "downgrade": {"provider": "zenmux", "model_id": "deepseek/deepseek-v4-flash", "model_ref": "deepseek v4 flash"},
+      "evidence": {"confidence": "medium", "source": "内部 review 配对", "metric": null, "url": null}
+    },
+    "feature-implementation": {
+      "tier": "T2", "reasoning_need": "medium",
+      "primary": {"provider": "openai-plus", "model_id": "gpt-5.5", "model_ref": "gpt-5.5", "effort": "high"},
+      "fallback": {"provider": "zai", "model_id": "glm-4.7", "model_ref": "glm-4.7"},
+      "downgrade": {"provider": "openai-plus", "model_id": "gpt-5.4", "model_ref": "gpt-5.4"},
+      "note": "multi-step delivery 先拆子任务，不单派 GLM",
+      "evidence": {"confidence": "medium", "source": "内部交付观察", "metric": null, "url": null}
+    },
+    "migration-schema": {
+      "tier": "T2", "reasoning_need": "medium",
+      "primary": {"provider": "zai", "model_id": "glm-4.7", "model_ref": "glm-4.7"},
+      "fallback": {"provider": "openai-plus", "model_id": "gpt-5.5", "model_ref": "gpt-5.5", "effort": "high"},
+      "downgrade": {"provider": "zai", "model_id": "glm-5-turbo", "model_ref": "glm-5-turbo"},
+      "evidence": {"confidence": "low", "source": "样本不足", "metric": null, "url": null}
+    },
+    "test-design": {
+      "tier": "T2", "reasoning_need": "medium",
+      "primary": {"provider": "openai-plus", "model_id": "gpt-5.5", "model_ref": "gpt-5.5", "effort": "high"},
+      "fallback": {"provider": "zenmux", "model_id": "anthropic/claude-opus-4.8", "model_ref": "claude opus 4.8", "effort": "high"},
+      "downgrade": null,
+      "note": "GLM 在 e2e test design 表现差",
+      "evidence": {"confidence": "medium", "source": "内部 e2e 用例回归", "metric": "GLM 失败率偏高", "url": null}
+    },
+    "mechanical-edit": {
+      "tier": "T3", "reasoning_need": "light",
+      "primary": {"provider": "zai", "model_id": "glm-5.1", "model_ref": "glm-5.1"},
+      "fallback": {"provider": "openai-plus", "model_id": "gpt-5.4", "model_ref": "gpt-5.4"},
+      "downgrade": {"provider": "zai", "model_id": "glm-5-turbo", "model_ref": "glm-5-turbo"},
+      "note": "CC 评分 4.88 标杆；强制 reference pattern + reviewer pass",
+      "evidence": {"confidence": "high", "source": "CC model-evaluations (sqlite)", "metric": "⭐ 4.88", "url": null}
+    },
+    "docs-comment-yaml": {
+      "tier": "T3", "reasoning_need": "light",
+      "primary": {"provider": "zai", "model_id": "glm-5-turbo", "model_ref": "glm-5-turbo"},
+      "fallback": {"provider": "openai-plus", "model_id": "gpt-5.4-mini", "model_ref": "gpt-5.4 mini"},
+      "downgrade": {"provider": "zenmux", "model_id": "deepseek/deepseek-v4-flash", "model_ref": "deepseek v4 flash"},
+      "evidence": {"confidence": "medium", "source": "内部文档任务观察", "metric": null, "url": null}
+    },
+    "ui-template": {
+      "tier": "T3", "reasoning_need": "light",
+      "primary": {"provider": "zai", "model_id": "glm-5.1", "model_ref": "glm-5.1"},
+      "fallback": {"provider": "openai-plus", "model_id": "gpt-5.4", "model_ref": "gpt-5.4"},
+      "downgrade": {"provider": "zai", "model_id": "glm-5-turbo", "model_ref": "glm-5-turbo"},
+      "evidence": {"confidence": "low", "source": "样本不足", "metric": null, "url": null}
+    },
+    "api-codegen-typescript": {
+      "tier": "T3", "reasoning_need": "light",
+      "primary": {"provider": "openai-plus", "model_id": "gpt-5.4", "model_ref": "gpt-5.4"},
+      "fallback": {"provider": "zai", "model_id": "glm-5.1", "model_ref": "glm-5.1"},
+      "downgrade": {"provider": "openai-plus", "model_id": "gpt-5.4-mini", "model_ref": "gpt-5.4 mini"},
+      "note": "TS/OpenAPI 生态原生",
+      "evidence": {"confidence": "medium", "source": "内部 codegen 观察", "metric": null, "url": null}
+    }
+  },
+
+  "mcp": {
+    "zai": [
+      {
+        "name": "web-search-prime",
+        "url": "https://open.bigmodel.cn/api/mcp/web_search_prime/sse",
+        "type": "remote",
+        "auth": "header:Authorization=${BIGMODEL_API_KEY}",
+        "capabilities": ["web_search"],
+        "note": "联网搜索"
+      },
+      {
+        "name": "web-reader",
+        "url": "https://open.bigmodel.cn/api/mcp/web_reader/sse",
+        "type": "remote",
+        "auth": "header:Authorization=${BIGMODEL_API_KEY}",
+        "capabilities": ["fetch_url", "extract_content"],
+        "note": "网页读取"
+      },
+      {
+        "name": "zread",
+        "url": "https://open.bigmodel.cn/api/mcp/zread/sse",
+        "type": "remote",
+        "auth": "header:Authorization=${BIGMODEL_API_KEY}",
+        "capabilities": ["document_parse", "pdf_extract"],
+        "note": "文档解析"
+      }
+    ]
+  },
+
+  "consumption_contract": {
+    "fetch": {
+      "models": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/models.json",
+      "routing": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/routing.json",
+      "merged": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/model-map.json",
+      "pin_version": "建议消费方 fetch 某个 release tag 而非 main，锁定 schema"
+    },
+    "how": "消费方启动时 fetch models.json + routing.json（或合并产物 model-map.json）→ 本地缓存 → 按需查询 models/task_types/mcp。task_types[].model_ref 可 join models.json[model_ref] 取价格/能力/跨家报价。",
+    "stale_policy": "fetch 失败/过期 → 用本地 stale snapshot 降级运行，不阻塞",
+    "review_due_expired": "可告警'选型可能过期'，但不停机",
+    "no_reverse_write": "消费方不反向写本仓；发现型号漂移回 PMO 提 issue，由下次 review 修 routing.json，objective 层由 sync 脚本自动跟随 models.dev",
+    "cross_provider_review_rule": "reviewer 模型必须与被审 implementation 跨 provider；redline_models 强制不分流",
+
+    "trigger_model_policy": {
+      "rule": "models.json 提供 offerings[] + cost；消费者自测哪个能触发 provider usage reset",
+      "rationale": "每个 provider 对免费/低价模型能否触发 reset 行为不同，HQ 无法替消费者判断",
+      "consumer_responsibility": [
+        "按 cheapest/offerings 排序，从最便宜开始测试",
+        "验证调用后是否触发 usage reset（非仅 200 响应）",
+        "若 free 模型不触发，fallback 到下一个最便宜付费模型",
+        "测试结果可回报 PMO 供后续 review 参考（非强制）"
+      ]
+    },
+
+    "mcp_policy": {
+      "rule": "mcp[provider][] 列出 provider 提供的 MCP 资源，消费者按需启用",
+      "auth_pattern": "header:{header_name}=${ENV_VAR}",
+      "consumer_responsibility": [
+        "自行管理 auth 凭据（ENV_VAR 在消费侧设置）",
+        "按 capabilities 判断是否适用当前任务",
+        "MCP 可用性不影响模型选型（失败域独立）"
+      ]
+    }
+  }
+}

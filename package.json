@@ -1,0 +1,19 @@
+{
+  "name": "ai-resource-config",
+  "version": "3.0.0",
+  "description": "Multi-provider AI model catalog with cross-provider pricing, task routing, and MCP resources.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "sync": "node tools/sync.mjs",
+    "sync:check": "node tools/sync.mjs --check",
+    "build": "node tools/build.mjs",
+    "validate": "node tools/validate.mjs",
+    "ci": "node tools/sync.mjs --check && node tools/validate.mjs && node tools/build.mjs"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dingmanjiang/ai-resource-config.git"
+  }
+}

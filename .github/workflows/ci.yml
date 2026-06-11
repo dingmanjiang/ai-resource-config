@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Hard gate: JSON validity + cross-file model_ref join + price sanity.
+      - run: node tools/validate.mjs
+      # Hard gate: merged artifact must be in sync with its sources.
+      - run: node tools/build.mjs
+      - name: Ensure model-map.json is committed in sync
+        run: |
+          if ! git diff --quiet model-map.json; then
+            echo "::error::model-map.json is stale. Run: node tools/build.mjs && commit."
+            git diff model-map.json
+            exit 1
+          fi
+
+  sync-drift:
+    runs-on: ubuntu-latest
+    # Soft signal: tells us models.dev moved. Never blocks merges.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check objective layer drift vs models.dev
+        run: node tools/sync.mjs --check

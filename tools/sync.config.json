@@ -1,0 +1,17 @@
+{
+  "$note": "Config for tools/sync.mjs. Edit the whitelist / filters here; do not hardcode in the script.",
+  "providers_of_interest": [
+    "zenmux",
+    "zai",
+    "openai",
+    "anthropic",
+    "deepseek",
+    "google",
+    "alibaba",
+    "zhipuai",
+    "openrouter"
+  ],
+  "provider_filters": {
+    "openrouter": "overlap_only"
+  }
+}

@@ -2,79 +2,65 @@
 
 **[English](CONTRIBUTING.md)** | **[中文](CONTRIBUTING.zh-CN.md)**
 
-感谢你有兴趣参与贡献！
+感谢你有兴趣参与！本项目分两层——请确保往正确的层贡献。
 
-## 贡献方式
+## 贡献哪一层？
 
-### 1. 更新定价数据
+| 层 | 文件 | 维护方式 | 如何贡献 |
+|----|------|----------|----------|
+| **客观层** | `models.json` | 从 [models.dev](https://models.dev) 自动同步 | **不要**手动编辑。请到 models.dev 上游修复，或在此开 Issue |
+| **主观层** | `routing.json` | 人工维护 | 欢迎 PR——这才是核心价值 |
 
-价格变化频繁。如果你发现过时的价格：
+**不要手动编辑 `models.json` 或 `model-map.json`。** 它们是自动生成的。编辑后会被 `npm run sync` / `npm run build` 覆盖，且会导致 CI 失败。
 
-1. 查阅 Provider 的官方定价页
-2. 更新 `model-map.json` 中的对应值
-3. 提交 PR，在描述中附上数据来源链接
+## 最有价值的贡献：路由证据
 
-### 2. 添加新 Provider
+最有用的 PR 是**用证据强化路由推荐**——把 `low`/`medium` 置信度的条目提升为 `high`，并附上可复现的数据。
 
-添加新 Provider（如 Groq、Together、Fireworks）：
+请先阅读 [METHODOLOGY.md](METHODOLOGY.md)。然后：
 
-1. 在 `model-map.json` 的 `providers` 部分添加条目：
+1. 在 `routing.json` 中选取一个 `task_types` 条目。
+2. 做最小规模的诚实测试（几个用例、一个可记录的指标——不是凭感觉）。
+3. 更新其 `primary`/`fallback`/`downgrade` 和 `evidence` 块：
+   ```json
+   "evidence": {
+     "confidence": "high",
+     "source": "Terminal-Bench 2026-05 / 12 internal cases",
+     "metric": "pass@1 0.82 vs GLM 0.51",
+     "url": "https://..."
+   }
+   ```
+4. `npm run validate` 必须通过。
 
+诚实的 `low` 置信度 PR 暴露了差距，同样欢迎。毫无证据却充满自信的主张则不然。
+
+## 其他贡献方式
+
+### 向客观层添加 Provider
+编辑 `tools/sync.config.json` 中的白名单，然后执行 `npm run sync`。使用 models.dev 的 provider id（可通过 models.dev API 查询）。不要手动添加模型。
+
+### 添加 MCP 资源
+在 `routing.json` 的 `mcp` 下添加：
 ```json
-"groq": {
-  "role": "inference-provider",
-  "all_models": [
-    {"id": "llama-3.3-70b", "cost": {"input": 0.59, "output": 0.79}, "context": 131072, "reasoning": true}
-  ],
-  "recommended": ["llama-3.3-70b"],
-  "free": [],
-  "flagship": "llama-3.3-70b",
-  "economy_downgrade": "llama-3.3-8b",
-  "mcp": []
+"mcp": {
+  "provider-name": [
+    { "name": "...", "url": "...", "type": "remote",
+      "auth": "header:Authorization=${ENV_VAR}",
+      "capabilities": ["..."], "note": "..." }
+  ]
 }
 ```
 
-2. 附上数据来源（API 端点或定价页 URL）
+### 修正价格
+价格来源于 models.dev。如果某个价格有误，请到上游 [models.dev](https://github.com/sst/models.dev) 修复，然后在此执行 `npm run sync`。
 
-### 3. 添加 MCP 资源
+## PR 流程
 
-如果 Provider 提供 MCP 服务器：
-
-```json
-"mcp": [
-  {
-    "name": "tool-name",
-    "url": "https://...",
-    "type": "remote",
-    "auth": "header:Authorization=${ENV_VAR}",
-    "capabilities": ["capability1", "capability2"],
-    "note": "Brief description"
-  }
-]
-```
-
-### 4. 改进任务类型路由
-
-`task_types` 部分将任务类别映射到推荐模型。如果你有证据（基准测试、实际使用经验）表明其他模型更适合：
-
-1. 描述任务类型
-2. 分享你的测试方法
-3. 提出修改建议
-
-## Pull Request 流程
-
-1. Fork 本仓库
-2. 创建分支：`git checkout -b add-groq-provider`
-3. 做出修改
-4. 验证 JSON 有效性：`cat model-map.json | jq .`
-5. 提交 PR，描述修改内容和数据来源
-
-## 数据质量规范
-
-- **标注来源**：附上官方定价页或 API 响应的链接
-- **统一单位**：定价使用 $/MTok（美元/百万 token）
-- **标记不确定性**：如果价格是估算的，添加 `note` 字段
-- **保持简洁**：不需要追踪每个模型变体，聚焦常用模型
+1. Fork 并创建分支。
+2. 修改 `routing.json`（或 `tools/sync.config.json`）。
+3. `npm run ci`（validate + build）必须通过。
+4. 连同你的改动一起提交重新生成的 `model-map.json`。
+5. 开一个 PR，描述改动内容、测试方法和数据来源。
 
 ## 有问题？
 

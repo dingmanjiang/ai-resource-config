@@ -2,79 +2,70 @@
 
 **[English](CONTRIBUTING.md)** | **[中文](CONTRIBUTING.zh-CN.md)**
 
-Thanks for your interest in contributing!
+Thanks for your interest! This project has two layers — please contribute to the right one.
 
-## Ways to Contribute
+## Which layer?
 
-### 1. Update Pricing Data
+| Layer | File | How it's maintained | Contribute by |
+|-------|------|---------------------|---------------|
+| **Objective** | `models.json` | Auto-synced from [models.dev](https://models.dev) | Do **not** hand-edit. Fix upstream at models.dev, or open an issue here |
+| **Subjective** | `routing.json` | Hand-maintained | PRs welcome — this is the value-add |
 
-Pricing changes frequently. If you spot outdated prices:
+**Do not hand-edit `models.json` or `model-map.json`.** They are generated. Editing them
+will be overwritten by `npm run sync` / `npm run build` and will fail CI.
 
-1. Check the provider's official pricing page
-2. Update `model-map.json` with correct values
-3. Submit a PR with source link in description
+## The most valuable contribution: routing evidence
 
-### 2. Add New Providers
+The single most useful PR is one that **strengthens a routing recommendation with evidence** —
+turning a `low`/`medium` confidence entry into `high` with reproducible data.
 
-To add a new provider (e.g., Groq, Together, Fireworks):
+Read [METHODOLOGY.md](METHODOLOGY.md) first. Then:
 
-1. Add entry in `providers` section of `model-map.json`:
+1. Pick a `task_types` entry in `routing.json`.
+2. Run the smallest honest test (a few cases, a recorded metric — not a vibe).
+3. Update its `primary`/`fallback`/`downgrade` and `evidence` block:
+   ```json
+   "evidence": {
+     "confidence": "high",
+     "source": "Terminal-Bench 2026-05 / 12 internal cases",
+     "metric": "pass@1 0.82 vs GLM 0.51",
+     "url": "https://..."
+   }
+   ```
+4. `npm run validate` must pass.
 
+An honest `low`-confidence PR that exposes a gap is welcome. A confident claim with no
+evidence is not.
+
+## Other contributions
+
+### Add a provider to the objective layer
+Edit the whitelist in `tools/sync.config.json`, then `npm run sync`. Use the models.dev
+provider id (check with the models.dev API). Do not hand-add models.
+
+### Add MCP resources
+Add under `mcp` in `routing.json`:
 ```json
-"groq": {
-  "role": "inference-provider",
-  "all_models": [
-    {"id": "llama-3.3-70b", "cost": {"input": 0.59, "output": 0.79}, "context": 131072, "reasoning": true}
-  ],
-  "recommended": ["llama-3.3-70b"],
-  "free": [],
-  "flagship": "llama-3.3-70b",
-  "economy_downgrade": "llama-3.3-8b",
-  "mcp": []
+"mcp": {
+  "provider-name": [
+    { "name": "...", "url": "...", "type": "remote",
+      "auth": "header:Authorization=${ENV_VAR}",
+      "capabilities": ["..."], "note": "..." }
+  ]
 }
 ```
 
-2. Include data source (API endpoint or pricing page URL)
+### Correct a price
+Prices come from models.dev. If one is wrong, fix it upstream at
+[models.dev](https://github.com/sst/models.dev), then `npm run sync` here.
 
-### 3. Add MCP Resources
+## PR process
 
-If a provider offers MCP servers:
-
-```json
-"mcp": [
-  {
-    "name": "tool-name",
-    "url": "https://...",
-    "type": "remote",
-    "auth": "header:Authorization=${ENV_VAR}",
-    "capabilities": ["capability1", "capability2"],
-    "note": "Brief description"
-  }
-]
-```
-
-### 4. Improve Task Type Routing
-
-The `task_types` section maps task categories to recommended models. If you have evidence (benchmarks, real-world testing) that a different model works better:
-
-1. Describe the task type
-2. Share your testing methodology
-3. Propose the change
-
-## Pull Request Process
-
-1. Fork the repo
-2. Create a branch: `git checkout -b add-groq-provider`
-3. Make your changes
-4. Test JSON validity: `cat model-map.json | jq .`
-5. Submit PR with description of changes and data sources
-
-## Data Quality Guidelines
-
-- **Source everything**: Include links to official pricing pages or API responses
-- **Use consistent units**: Pricing in $/MTok (dollars per million tokens)
-- **Mark uncertainty**: If a price is estimated, add a `note` field
-- **Keep it simple**: We're not tracking every model variant, focus on commonly used ones
+1. Fork and branch.
+2. Make changes to `routing.json` (or `tools/sync.config.json`).
+3. `npm run ci` (validate + build) must pass.
+4. Commit the regenerated `model-map.json` alongside your change.
+5. Open a PR describing the change, the test method, and sources.
 
 ## Questions?
 

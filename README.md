@@ -2,91 +2,121 @@
 
 **[English](README.md)** | **[中文](README.zh-CN.md)**
 
-**Multi-provider AI model catalog with pricing, routing strategies, and MCP resources.**
+**A two-layer AI model decision base: objective data aggregated from upstream, plus hand-curated task routing.**
 
-Help individual developers and small teams manage AI costs and model selection across multiple providers.
+This is not another model leaderboard. It is a directly consumable config that answers three questions for an individual/small-team AI developer:
 
-## What's Inside
+1. **What models exist, and where can I get them, for how much?** (cross-provider price comparison)
+2. **Which model should I use for this kind of task?** (task → model routing, with evidence)
+3. **What MCP tools can each provider give me?**
+
+## Architecture: two layers
 
 ```
-ai-resource-config/
-├── model-map.json          # Main config: models + pricing + routing
-├── providers/              # Per-provider details (coming soon)
-└── tools/                  # CLI utilities (coming soon)
+models.json     # OBJECTIVE — auto-synced from models.dev (MIT). Never hand-edited.
+                #   model catalog · capabilities · cross-provider pricing
+routing.json    # SUBJECTIVE — hand-maintained. The actual value-add.
+                #   task_types routing · curated picks · redline · MCP · contract
+model-map.json  # MERGED artifact (objective + subjective), for one-fetch consumers.
+tools/          # sync.mjs · validate.mjs · build.mjs
 ```
+
+**Why split?** The objective layer (prices, context windows, capabilities) is a commodity — we do not re-maintain it by hand; we derive it from [models.dev](https://models.dev). The subjective layer (what to use when) is the only part that needs human judgment, and the only part worth contributing to.
 
 ## Quick Start
 
-### Fetch the config
+### Fetch
 
 ```bash
-# One-liner fetch
-curl -s https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/model-map.json \
-  -o model-map.snapshot.json
+# Objective layer (model catalog + cross-provider pricing)
+curl -sO https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/models.json
 
-# Or use in your code
-const MODEL_MAP_URL = "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/model-map.json";
-const config = await fetch(MODEL_MAP_URL).then(r => r.json());
+# Subjective layer (routing + curated picks)
+curl -sO https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/routing.json
+
+# Or the merged single file
+curl -sO https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/model-map.json
 ```
 
-### Use the data
+> Consumers should pin a release tag rather than `main` to lock the schema.
+
+### Cross-provider price comparison
 
 ```javascript
-// Find cheapest model for trigger/ping
-const zenmux = config.providers.zenmux;
-const cheapest = zenmux.all_models
-  .sort((a, b) => (a.cost.input + a.cost.output) - (b.cost.input + b.cost.output))[0];
-console.log(cheapest.id); // "stepfun/step-3.7-flash-free"
+const models = await fetch(MODELS_URL).then(r => r.json());
 
-// Get free models
-console.log(zenmux.free); // ["stepfun/step-3.7-flash-free", "z-ai/glm-4.7-flash-free", ...]
-
-// Get MCP resources from Z.AI
-const zai = config.providers.zai;
-console.log(zai.mcp.map(m => m.name)); // ["web-search-prime", "web-reader", "zread"]
+// Same model, every provider that offers it, sorted cheapest-first.
+const opus = models.models["claude opus 4.8"];
+console.log(opus.offerings);
+// [ {provider:"zenmux", input:5, output:25}, {provider:"anthropic", ...}, ... ]
+console.log(opus.cheapest); // { provider: "zenmux", total_per_mtok: 30 }
 ```
 
-## Data Structure
+### Task routing (join the two layers)
 
-### `model-map.json`
+```javascript
+const routing = await fetch(ROUTING_URL).then(r => r.json());
+
+const task = routing.task_types["spec-architecture"];
+console.log(task.primary);   // { provider:"zenmux", model_id:"...", model_ref:"claude opus 4.8", effort:"high" }
+console.log(task.evidence);  // { confidence:"high", source:"...", ... }
+
+// model_ref joins back into the objective layer for price/capability:
+const priced = models.models[task.primary.model_ref];
+```
+
+## Data layers in detail
+
+### `models.json` (objective, generated)
 
 | Field | Description |
 |-------|-------------|
-| `providers[].all_models[]` | Full model list with pricing (`cost.input`, `cost.output` in $/MTok) |
-| `providers[].recommended[]` | Curated models for production use |
-| `providers[].free[]` | Zero-cost models |
-| `providers[].mcp[]` | MCP server resources (url, auth, capabilities) |
-| `task_types{}` | Task → model routing recommendations |
+| `models[key].offerings[]` | Every whitelisted provider offering this model, with `input`/`output`/`cache_read` cost in $/MTok |
+| `models[key].cheapest` | Lowest-cost provider for this model |
+| `models[key].context` / `reasoning` / `modalities` | Capability metadata |
+| keyed by normalized display name | e.g. `"claude opus 4.8"` — stable across providers |
 
-### Providers Currently Tracked
+Whitelist of aggregated providers lives in `tools/sync.config.json`. OpenRouter is included as a *price-comparison basis only* (kept only where another provider also offers the model).
 
-| Provider | Role | Models | Free | MCP |
-|----------|------|--------|------|-----|
-| ZenMux | Aggregator (PAYG) | 58 | 4 | - |
-| Z.AI | Coding Plan | 5 | 1 | 3 |
-| OpenAI Plus | OAuth Direct | 4 | - | - |
+### `routing.json` (subjective, hand-maintained)
 
-## Update Cycle
+| Field | Description |
+|-------|-------------|
+| `task_types{}` | task → `primary`/`fallback`/`downgrade`, each with `model_ref` + `evidence` |
+| `provider_picks{}` | per-provider `recommended` / `flagship` / `economy_downgrade` / `free` |
+| `redline_models[]` | models that must never be routed away from |
+| `mcp{}` | MCP server resources per provider |
+| `consumption_contract{}` | how to fetch, stale policy, trigger-model policy |
 
-- **30-day review** or **flagship model release** triggers update
-- Data sources: Provider APIs, official pricing pages
-- Community PRs welcome for corrections
+Routing methodology — how task labels are defined and how a model pairing earns its `evidence` — is documented in [METHODOLOGY.md](METHODOLOGY.md).
+
+## Maintenance workflow
+
+```bash
+npm run sync       # refresh models.json from models.dev
+npm run validate   # check JSON + cross-file model_ref join + price sanity
+npm run build      # regenerate merged model-map.json
+npm run ci         # all of the above (what CI runs)
+```
+
+- **Objective layer**: `npm run sync` on a 30-day cadence or after a flagship release. You only review the diff.
+- **Subjective layer**: edit `routing.json` by hand when your testing changes a recommendation. Add/raise `evidence.confidence` as samples accumulate.
+- CI hard-gates `validate` + merged-artifact freshness; `sync-drift` is a soft signal that models.dev moved.
 
 ## Use Cases
 
-1. **Cost optimization**: Find cheapest model for your task
-2. **Trigger model selection**: Test which free/cheap model can trigger usage reset
-3. **MCP discovery**: Find available MCP tools from providers
-4. **Multi-provider routing**: Route tasks to appropriate models
+1. **Cost optimization** — find the cheapest provider for a given model
+2. **Task routing** — which model for which task, with the evidence behind it
+3. **Trigger-model selection** — sort `offerings` by cost to test usage-reset triggers
+4. **MCP discovery** — available MCP tools per provider
 
 ## Contributing
 
-PRs welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
+PRs welcome — especially routing evidence. See [CONTRIBUTING.md](CONTRIBUTING.md) and [METHODOLOGY.md](METHODOLOGY.md).
 
-- Add new providers
-- Update pricing
-- Improve task_type routing
-- Add CLI tools
+## Attribution
+
+Objective model data is derived from [models.dev](https://github.com/sst/models.dev) (MIT). Subjective routing and curation are original to this project.
 
 ## License
 
@@ -94,6 +124,6 @@ MIT
 
 ## Related Projects
 
-- [LiteLLM](https://github.com/BerriAI/litellm) - Runtime AI gateway
-- [OpenRouter](https://openrouter.ai) - Model aggregator
-- [AgentOps](https://github.com/AgentOps-AI/agentops) - Cost tracking SDK
+- [models.dev](https://models.dev) — the open model database this project's objective layer is derived from
+- [LiteLLM](https://github.com/BerriAI/litellm) — runtime AI gateway
+- [OpenRouter](https://openrouter.ai) — model aggregator
