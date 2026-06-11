@@ -235,7 +235,7 @@
   },
 
   "consumption_contract": {
-    "fetch_url": "https://raw.githubusercontent.com/dingmanjiang/pos-config/main/ai-ops-orchestrator/model-map.json",
+    "fetch_url": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/model-map.json",
     "how": "消费方启动时 fetch 本文件 → 本地缓存 → 按需查询 all_models/task_types/mcp",
     "stale_policy": "fetch 失败/过期 → 用本地 stale snapshot 降级运行，不阻塞",
     "review_due_expired": "可告警'选型可能过期'，但不停机",
