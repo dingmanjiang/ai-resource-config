@@ -188,10 +188,18 @@
 
   "consumption_contract": {
     "fetch": {
-      "models": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/models.json",
-      "routing": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/routing.json",
-      "merged": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/model-map.json",
-      "pin_version": "建议消费方 fetch 某个 release tag 而非 main，锁定 schema"
+      "pinned_example": {
+        "tag": "v3.0.0",
+        "models": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/v3.0.0/models.json",
+        "routing": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/v3.0.0/routing.json",
+        "merged": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/v3.0.0/model-map.json"
+      },
+      "latest": {
+        "models": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/models.json",
+        "routing": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/routing.json",
+        "merged": "https://raw.githubusercontent.com/dingmanjiang/ai-resource-config/main/model-map.json"
+      },
+      "recommendation": "POS/消费方 fetch pinned tag 锁定 schema；schema 变更时手动升 tag。latest(main) 仅用于人查看或主动追新。"
     },
     "how": "消费方启动时 fetch models.json + routing.json（或合并产物 model-map.json）→ 本地缓存 → 按需查询 models/task_types/mcp。task_types[].model_ref 可 join models.json[model_ref] 取价格/能力/跨家报价。",
     "stale_policy": "fetch 失败/过期 → 用本地 stale snapshot 降级运行，不阻塞",
