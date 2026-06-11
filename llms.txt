@@ -1,0 +1,45 @@
+# AI Resource Config
+
+> A two-layer AI model decision base: objective model catalog and cross-provider pricing from models.dev, plus hand-curated task routing, provider picks, redline policy, and MCP resources.
+
+AI Resource Config is a directly consumable configuration dataset for AI gateways, coding agents, and individual/small-team model routing. It is not a model leaderboard. Use it to answer: what models exist, where they are available, how much they cost, which model to use for a task type, and which MCP resources a provider exposes.
+
+Core data contract:
+
+- `models.json` is the generated objective layer. It contains normalized model keys, capabilities, context windows, provider offerings, and prices.
+- `routing.json` is the hand-maintained subjective layer. It contains task routing, provider picks, redline models, MCP resources, and the consumption contract.
+- `model-map.json` is the generated merged artifact for one-fetch consumers.
+- Routing entries join to objective data through `primary.model_ref`, `fallback.model_ref`, and `downgrade.model_ref`, which are keys into `models.json.models`.
+- Consumers should pin a release tag instead of `main` when schema stability matters.
+
+## Start Here
+
+- [README](README.md): Human-facing overview, architecture, quick start, and use cases.
+- [Contributing](CONTRIBUTING.md): Contribution rules, generated-file boundaries, and PR process.
+- [Routing Methodology](METHODOLOGY.md): Task label system, evidence standard, confidence levels, fallback/downgrade rules, and known limitations.
+- [Agent Instructions](AGENTS.md): Coding-agent instructions for editing, validating, and reviewing this repository.
+
+## Data Files
+
+- [models.json](models.json): Objective model catalog and cross-provider pricing generated from models.dev. Do not hand-edit.
+- [routing.json](routing.json): Subjective routing layer maintained by this project. Edit this for task recommendations, provider picks, redline policy, MCP resources, and consumption contract.
+- [model-map.json](model-map.json): Generated merge of `models.json` and `routing.json`. Do not hand-edit.
+
+## Tooling
+
+- [package.json](package.json): npm scripts for sync, validation, build, and CI.
+- [Sync tool](tools/sync.mjs): Refreshes `models.json` from models.dev according to `tools/sync.config.json`.
+- [Validate tool](tools/validate.mjs): Checks JSON validity, model_ref joins, pricing sanity, and generated artifact freshness.
+- [Build tool](tools/build.mjs): Regenerates `model-map.json` from the objective and subjective layers.
+- [Sync config](tools/sync.config.json): Provider whitelist and sync behavior.
+
+## Live And Upstream
+
+- [Live dashboard](https://ai.geekszone.info/): Interactive model table, provider overview, task routing, and price heatmap.
+- [GitHub repository](https://github.com/dingmanjiang/ai-resource-config): Canonical source repository.
+- [models.dev](https://models.dev/): Upstream objective model database used by `models.json`.
+
+## Optional
+
+- [Chinese README](README.zh-CN.md): Chinese project overview.
+- [Chinese Contributing Guide](CONTRIBUTING.zh-CN.md): Chinese contribution guide.

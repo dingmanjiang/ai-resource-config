@@ -5,6 +5,8 @@
 > **[>> 可视化面板 / Live Dashboard <<](https://ai.geekszone.info/)**
 > Task routing table · Model comparison · Provider overview · Price heatmap — 交互式浏览所有数据，无需下载 JSON。
 
+> **AI entrypoints:** use [`llms.txt`](llms.txt) for the project/data index, and [`AGENTS.md`](AGENTS.md) for coding-agent instructions.
+
 **A two-layer AI model decision base: objective data aggregated from upstream, plus hand-curated task routing.**
 
 This is not another model leaderboard. It is a directly consumable config that answers three questions for an individual/small-team AI developer:
