@@ -2,6 +2,9 @@
 
 **[English](README.md)** | **[中文](README.zh-CN.md)**
 
+> **[>> 可视化面板 / Live Dashboard <<](https://dingmanjiang.github.io/ai-resource-config/)**
+> Task routing table · Model comparison · Provider overview · Price heatmap — 交互式浏览所有数据，无需下载 JSON。
+
 **A two-layer AI model decision base: objective data aggregated from upstream, plus hand-curated task routing.**
 
 This is not another model leaderboard. It is a directly consumable config that answers three questions for an individual/small-team AI developer:
