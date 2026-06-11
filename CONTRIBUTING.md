@@ -1,5 +1,7 @@
 # Contributing to AI Resource Config
 
+**[English](CONTRIBUTING.md)** | **[中文](CONTRIBUTING.zh-CN.md)**
+
 Thanks for your interest in contributing!
 
 ## Ways to Contribute

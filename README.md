@@ -1,5 +1,7 @@
 # AI Resource Config
 
+**[English](README.md)** | **[中文](README.zh-CN.md)**
+
 **Multi-provider AI model catalog with pricing, routing strategies, and MCP resources.**
 
 Help individual developers and small teams manage AI costs and model selection across multiple providers.
